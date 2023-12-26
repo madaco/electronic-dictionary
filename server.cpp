@@ -7,10 +7,40 @@
 #include <pthread.h>
 #include <stdlib.h>
 
+pthread_t tid_send,tid_recv;
+int socket_cli;
+
+char sendBuf[100];
+char recvBuf[100];
+
+void *thfunc_send(void *arg)
+{
+    while(1)
+    {
+        memset(sendBuf, 0, sizeof(sendBuf));
+        //printf("send:");
+        scanf("%s",sendBuf);
+        send(socket_cli, sendBuf, strlen(sendBuf)+1, 0);
+    }
+    pthread_exit(NULL);
+}
+
+void *thfunc_recv(void *arg)
+{
+    while(1)
+    {
+        int buflen = recv(socket_cli, recvBuf, 100, 0);
+        if(recv > 0)
+        {
+            printf("receive:%s\n",recvBuf);
+        }
+    }
+    pthread_exit(NULL);
+}
+
 int main()
 {
-    char sendBuf[100];
-    char recvBuf[100];
+
 
     int socket_serv;
     sockaddr_in addr_serv;
@@ -46,39 +76,40 @@ int main()
 
     listen(socket_serv, 5);
 
-    int socket_cli;
+    
     sockaddr_in addr_cli;
     socklen_t len = sizeof(addr_cli);
 
-    while(1)
+
+    printf("-------wait for client-------\n");
+    socket_cli = accept(socket_serv, (struct sockaddr *)(&addr_cli), &len);
+
+    //连接成功后首先发送信息
+    sprintf(sendBuf, "Welcome client(ip=%s,port=%d) to Server!", inet_ntoa(addr_cli.sin_addr), ntohs(addr_cli.sin_port));
+    send(socket_cli, sendBuf, strlen(sendBuf)+1, 0);
+
+    //接收信息
+    recv(socket_cli, recvBuf, 100, 0);
+    printf("Receive client's msg: %s\n",recvBuf);
+
+    res = pthread_create(&tid_send, NULL, thfunc_send, NULL);
+    if (res)
     {
-        printf("-------wait for client-------\n");
-        socket_cli = accept(socket_serv, (struct sockaddr *)(&addr_cli), &len);
-
-        //连接成功后首先发送信息
-        sprintf(sendBuf, "Welcome client(ip=%s,port=%d) to Server!", inet_ntoa(addr_cli.sin_addr), ntohs(addr_cli.sin_port));
-        send(socket_cli, sendBuf, strlen(sendBuf)+1, 0);
-
-        //接收信息
-        recv(socket_cli, recvBuf, 100, 0);
-        printf("Receive client's msg: %s\n",recvBuf);
-
-        while(1)
-        {
-            recv(socket_cli, recvBuf, 100, 0);
-            printf("Receive client's msg: %s\n",recvBuf);
-            if(strcmp(recvBuf, "exit") == 0)
-            break;
-        }
-        close(socket_cli);
-
-        puts("continue to listen?(y/n)");
-        char ch[2];
-        scanf("%s",ch, 2);
-        if(ch[0] != 'y')
-        break;
-
+        perror("thread_send create failed");
+        return -1;
     }
+    
+    res = pthread_create(&tid_recv, NULL, thfunc_recv, NULL);
+    if (res)
+    {
+        perror("thread_recv create failed");
+        return -1;
+    }
+
+    pthread_join(tid_send, NULL);
+    pthread_join(tid_recv, NULL);
+
+    close(socket_cli);
     close(socket_serv);
     return 0;
 }
