@@ -18,10 +18,17 @@ void *thfunc_send(void *arg)
 {
     while(1)
     {
+        pthread_testcancel();
+        printf("(发送exit代表结束对话)：");
         memset(sendBuf, 0, sizeof(sendBuf));
         //printf("send:");
         scanf("%s",sendBuf);
         send(socket_client, sendBuf, strlen(sendBuf)+1, 0);
+        if(strcmp(sendBuf, "exit") == 0)
+        {
+            pthread_cancel(tid_recv);
+            break;
+        }
     }
     pthread_exit(NULL);
 }
@@ -30,10 +37,16 @@ void *thfunc_recv(void *arg)
 {
     while(1)
     {
+        pthread_testcancel();
         int buflen = recv(socket_client, recvBuf, 100, 0);
         if(recv > 0)
         {
             printf("receive:%s\n",recvBuf);
+            if(strcmp(recvBuf, "exit") == 0)
+            {
+                pthread_cancel(tid_send);
+                break;
+            }
         }
     }
     pthread_exit(NULL);
